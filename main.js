@@ -9,33 +9,24 @@ const sunIcon = document.getElementById("sunIcon");
 const expressionDisplay = document.getElementById("expression");
 const resultDisplay = document.getElementById("result");
 const numberButtons = document.querySelectorAll("#calculatorButtons button");
-const clearButton = [...numberButtons].find(button => button.textContent.trim() === "AC");
-const backspaceButton = [...numberButtons].find(button => button.textContent.trim() === "⌫");
-const percentButton = [...numberButtons].find(button => button.textContent.trim() === "%");
-const signButton = [...numberButtons].find(button => button.textContent.trim() === "±");
-const equalsButton = [...numberButtons].find(button => button.textContent.trim() === "=");
+const scientificButtonElements = document.querySelectorAll("#scientificButtons button");
+
+const findButton = label =>
+    [...numberButtons].find(button => button.textContent.trim() === label);
+
+const clearButton = findButton("AC");
+const backspaceButton = findButton("⌫");
+const percentButton = findButton("%");
+const signButton = findButton("±");
+const equalsButton = findButton("=");
 
 let isScientific = false;
-
-modeToggle.addEventListener("click", () => {
-    isScientific = !isScientific;
-    modeLabel.textContent = isScientific ? "Scientific" : "Standard";
-    scientificButtons.classList.toggle("hidden", !isScientific);
-    scientificButtons.classList.toggle("grid", isScientific);
-});
-
-themeToggle.addEventListener("click", () => {
-    document.body.classList.toggle("dark");
-    moonIcon.classList.toggle("hidden");
-    sunIcon.classList.toggle("hidden");
-});
-
-// Calculator State
 let currentInput = "0";
 let expression = "";
 let fullExpression = "";
 let justCalculated = false;
 
+// Display
 function updateDisplay() {
     resultDisplay.textContent = currentInput;
     expressionDisplay.textContent = expression;
@@ -43,30 +34,55 @@ function updateDisplay() {
 
 updateDisplay();
 
+// Mode Toggle
+modeToggle.addEventListener("click", () => {
+    isScientific = !isScientific;
+    modeLabel.textContent = isScientific ? "Scientific" : "Standard";
+    scientificButtons.classList.toggle("hidden", !isScientific);
+    scientificButtons.classList.toggle("grid", isScientific);
+});
+
+// Theme Toggle
+themeToggle.addEventListener("click", () => {
+    document.body.classList.toggle("dark");
+    moonIcon.classList.toggle("hidden");
+    sunIcon.classList.toggle("hidden");
+});
+
+// Reset
+function clearCalculator() {
+    currentInput = "0";
+    expression = "";
+    fullExpression = "";
+    justCalculated = false;
+    updateDisplay();
+}
+
+// Percentage
 function handlePercentage() {
-    if (currentInput === "Error" || currentInput === "Infinity") return;
+    if (currentInput === "Error" || currentInput.includes("Infinity")) return;
 
     const percentage = Number(currentInput);
     const match = fullExpression.match(/^(.*)([+\-×÷])(-?\d*\.?\d+)$/);
 
     if (match) {
         const previousNumber = Number(match[1]);
-        const lastOperator = match[2];
+        const operator = match[2];
 
-        if (lastOperator === "+" || lastOperator === "−") {
+        if (operator === "+" || operator === "−") {
             currentInput = String(previousNumber * percentage / 100);
         } else {
             currentInput = String(percentage / 100);
         }
 
-        fullExpression = match[1] + lastOperator + currentInput;
+        fullExpression = match[1] + operator + currentInput;
     } else {
         currentInput = String(percentage / 100);
         fullExpression = currentInput;
     }
 
-    justCalculated = false;
     expression = fullExpression;
+    justCalculated = false;
     updateDisplay();
 }
 
@@ -75,7 +91,6 @@ numberButtons.forEach(button => {
     button.addEventListener("click", () => {
         const value = button.textContent.trim();
 
-        // Start a fresh calculation after equals
         if (justCalculated && !isNaN(value)) {
             currentInput = "0";
             fullExpression = "";
@@ -84,7 +99,7 @@ numberButtons.forEach(button => {
         }
 
         if (!isNaN(value)) {
-            if (currentInput === "Error" || currentInput === "Infinity") {
+            if (currentInput === "Error" || currentInput.includes("Infinity")) {
                 currentInput = value;
                 fullExpression = value;
                 expression = "";
@@ -111,7 +126,7 @@ numberButtons.forEach(button => {
                 justCalculated = false;
             }
         } else if (["+", "−", "×", "÷"].includes(value)) {
-            if (currentInput === "Error" || currentInput === "Infinity") return;
+            if (currentInput === "Error" || currentInput.includes("Infinity")) return;
 
             fullExpression += value;
             expression = fullExpression;
@@ -122,6 +137,153 @@ numberButtons.forEach(button => {
         updateDisplay();
     });
 });
+
+// Scientific Functions
+function getCurrentNumberStart() {
+    const match = fullExpression.match(/(\d*\.?\d+)$/);
+    return match ? fullExpression.length - match[0].length : fullExpression.length;
+}
+
+function handleScientificFunction(value) {
+    if (currentInput === "Error" || currentInput.includes("Infinity")) return;
+
+    const number = Number(currentInput);
+    const start = getCurrentNumberStart();
+    const prefix = fullExpression.slice(0, start);
+    let result;
+    let functionName;
+
+    switch (value) {
+        case "√":
+            if (number < 0) return showError();
+            result = Math.sqrt(number);
+            functionName = `√(${currentInput})`;
+            break;
+
+        case "x²":
+            result = number ** 2;
+            functionName = `(${currentInput})²`;
+            break;
+
+        case "sin":
+            result = Math.sin(number * Math.PI / 180);
+            functionName = `sin(${currentInput})`;
+            break;
+
+        case "cos":
+            result = Math.cos(number * Math.PI / 180);
+            functionName = `cos(${currentInput})`;
+            break;
+
+        case "tan":
+            result = Math.tan(number * Math.PI / 180);
+            functionName = `tan(${currentInput})`;
+            break;
+
+        case "log":
+            if (number <= 0) return showError();
+            result = Math.log10(number);
+            functionName = `log(${currentInput})`;
+            break;
+
+        case "ln":
+            if (number <= 0) return showError();
+            result = Math.log(number);
+            functionName = `ln(${currentInput})`;
+            break;
+
+        default:
+            return;
+    }
+
+    const formatted = formatResult(result);
+    if (formatted === "Error") return showError();
+
+    fullExpression = prefix + `(${formatted})`;
+    currentInput = formatted;
+    expression = functionName;
+    justCalculated = true;
+    updateDisplay();
+}
+
+// Scientific Buttons
+scientificButtonElements.forEach(button => {
+    button.addEventListener("click", () => {
+        const value = button.textContent.trim();
+
+        if (["√", "x²", "sin", "cos", "tan", "log", "ln"].includes(value)) {
+            handleScientificFunction(value);
+            return;
+        }
+
+        if (value === "xʸ") {
+            if (currentInput === "Error" || currentInput.includes("Infinity")) return;
+            fullExpression += "**";
+            expression = fullExpression;
+            currentInput = "0";
+            justCalculated = false;
+        }
+
+        if (value === "π" || value === "e") {
+            const constant = value === "π" ? Math.PI : Math.E;
+            const constantText = String(constant);
+
+            if (justCalculated) {
+                fullExpression = "";
+                expression = "";
+                justCalculated = false;
+            }
+
+            if (currentInput !== "0" && !["+", "−", "×", "÷", "("].includes(fullExpression.slice(-1))) {
+                fullExpression += "*";
+            }
+
+            fullExpression += constantText;
+            currentInput = constantText;
+            expression = fullExpression;
+        }
+
+        if (value === "(") {
+            if (justCalculated) {
+                fullExpression = "";
+                expression = "";
+                currentInput = "0";
+                justCalculated = false;
+            } else if (currentInput !== "0" && !["+", "−", "×", "÷", "("].includes(fullExpression.slice(-1))) {
+                fullExpression += "*";
+            }
+
+            fullExpression += "(";
+            currentInput = "0";
+            expression = fullExpression;
+        }
+
+        if (value === ")") {
+            fullExpression += ")";
+            expression = fullExpression;
+            justCalculated = false;
+        }
+
+        updateDisplay();
+    });
+});
+
+// Format Results
+function formatResult(result) {
+    if (Number.isNaN(result)) return "Error";
+    if (result === Infinity) return "Infinity";
+    if (result === -Infinity) return "-Infinity";
+
+    return String(Number(result.toFixed(10)));
+}
+
+function showError() {
+    currentInput = "Error";
+    expression = fullExpression;
+    fullExpression = "";
+    justCalculated = false;
+    updateDisplay();
+}
 
 // Equals Button
 equalsButton.addEventListener("click", () => {
@@ -140,47 +302,32 @@ equalsButton.addEventListener("click", () => {
         }
 
         expression = fullExpression + " =";
-        currentInput = String(
-            Number.isFinite(result) ? Number(result.toFixed(10)) : "Infinity"
-        );
-
+        currentInput = formatResult(result);
         fullExpression = currentInput;
         justCalculated = true;
         updateDisplay();
     } catch {
-        currentInput = "Error";
-        expression = fullExpression;
-        fullExpression = "";
-        justCalculated = false;
-        updateDisplay();
+        showError();
     }
 });
 
 // AC Button
-clearButton.addEventListener("click", () => {
-    currentInput = "0";
-    expression = "";
-    fullExpression = "";
-    justCalculated = false;
-    updateDisplay();
-});
+clearButton.addEventListener("click", clearCalculator);
 
 // Backspace Button
 backspaceButton.addEventListener("click", () => {
-    if (currentInput === "Error" || currentInput === "Infinity") {
-        currentInput = "0";
-        fullExpression = "";
-        expression = "";
-    } else {
-        if (currentInput.length > 1) {
-            currentInput = currentInput.slice(0, -1);
-        } else {
-            currentInput = "0";
-        }
-
-        fullExpression = fullExpression.slice(0, -1);
+    if (currentInput === "Error" || currentInput.includes("Infinity")) {
+        clearCalculator();
+        return;
     }
 
+    if (currentInput.length > 1) {
+        currentInput = currentInput.slice(0, -1);
+    } else {
+        currentInput = "0";
+    }
+
+    fullExpression = fullExpression.slice(0, -1);
     justCalculated = false;
     updateDisplay();
 });
@@ -190,13 +337,11 @@ percentButton.addEventListener("click", handlePercentage);
 
 // Sign Button
 signButton.addEventListener("click", () => {
-    if (currentInput === "0" || currentInput === "Error" || currentInput === "Infinity") return;
+    if (currentInput === "0" || currentInput === "Error" || currentInput.includes("Infinity")) return;
 
-    if (currentInput.startsWith("-")) {
-        currentInput = currentInput.slice(1);
-    } else {
-        currentInput = "-" + currentInput;
-    }
+    currentInput = currentInput.startsWith("-")
+        ? currentInput.slice(1)
+        : "-" + currentInput;
 
     fullExpression = fullExpression.slice(0, -currentInput.replace("-", "").length);
     fullExpression += currentInput;
@@ -211,24 +356,18 @@ document.addEventListener("keydown", event => {
     const key = event.key;
 
     if (key >= "0" && key <= "9") {
-        const button = [...numberButtons].find(btn => btn.textContent.trim() === key);
-        button?.click();
+        findButton(key)?.click();
     } else if (key === ".") {
-        const decimalButton = [...numberButtons].find(btn => btn.textContent.trim() === ".");
-        decimalButton?.click();
+        findButton(".")?.click();
     } else if (key === "+") {
-        const button = [...numberButtons].find(btn => btn.textContent.trim() === "+");
-        button?.click();
+        findButton("+")?.click();
     } else if (key === "-") {
-        const button = [...numberButtons].find(btn => btn.textContent.trim() === "−");
-        button?.click();
+        findButton("−")?.click();
     } else if (key === "*") {
-        const button = [...numberButtons].find(btn => btn.textContent.trim() === "×");
-        button?.click();
+        findButton("×")?.click();
     } else if (key === "/") {
         event.preventDefault();
-        const button = [...numberButtons].find(btn => btn.textContent.trim() === "÷");
-        button?.click();
+        findButton("÷")?.click();
     } else if (key === "Enter" || key === "=") {
         event.preventDefault();
         equalsButton.click();
